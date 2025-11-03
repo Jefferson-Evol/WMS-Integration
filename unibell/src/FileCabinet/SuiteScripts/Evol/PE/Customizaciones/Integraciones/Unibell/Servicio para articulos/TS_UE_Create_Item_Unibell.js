@@ -48,6 +48,7 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
                         "custitem_uni_fiscalizado": "T",
                         "purchasedescription": "AMONIACO BAKER 28%",
                         "custitem_uni_clas_inventario": "1"
+                        // agregar el campo de node de jerarquia
                     }
 
                     log.audit('JSON estático a enviar', JSON.stringify(json, null, 2));
@@ -124,7 +125,6 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
             }
 
         }
-
 
 
         // FUNCIONES
