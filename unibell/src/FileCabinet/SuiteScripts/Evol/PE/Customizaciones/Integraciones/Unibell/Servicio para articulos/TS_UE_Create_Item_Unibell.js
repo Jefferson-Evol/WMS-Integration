@@ -16,7 +16,7 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
     (http, https, log, record, search) => {
         const COMPANY_DEST = 'Unibell';
         const SYSTEM_DEST = 'Artículos';
-        const METHOD = 'POST';
+        const METHOD = 2;
 
 
         const afterSubmit = (context) => {
@@ -156,16 +156,16 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
                 incomeaccount: item.getValue('incomeaccount'),
                 taxschedule: item.getValue('taxschedule'),
                 custitem_pe_existence_type: item.getValue('custitem_pe_existence_type'),
-                custitem_pe_cod_existence_type: item.getValue('custitem_pe_cod_existence_type'),
-                custitem_pe_inventory_catalog: item.getValue('custitem_pe_inventory_catalog'),
+             //   custitem_pe_cod_existence_type: item.getValue('custitem_pe_cod_existence_type'),
+              //  custitem_pe_inventory_catalog: item.getValue('custitem_pe_inventory_catalog'),
                 custitem_pe_cod_inventory_catalog: item.getValue('custitem_pe_cod_inventory_catalog'),
                 custitem_pe_measurement_unit: item.getValue('custitem_pe_measurement_unit'),
                 custitem_pe_cod_measure_unit: item.getValue('custitem_pe_cod_measure_unit'),
                 custitem_pe_valuation_method: item.getValue('custitem_pe_valuation_method'),
-                custitem_pe_cod_valuation_method: item.getValue('custitem_pe_cod_valuation_method'),
+              //  custitem_pe_cod_valuation_method: item.getValue('custitem_pe_cod_valuation_method'),
                 custitem_pe_purchase_account: item.getValue('custitem_pe_purchase_account'),
                 custitem_pe_variation_account: item.getValue('custitem_pe_variation_account'),
-                jerarquia: item.getValue('jerarquia')
+                hierarchynode: item.getValue('hierarchynode')
             };
 
 
@@ -233,21 +233,37 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
    
         const saveIntegrationLog = (params) => {
             try {
+
+                log.audit('saveRequest - Inicio', JSON.stringify(params));
+
                 const logRecord = record.create({
                     type: 'customrecord_ts_outb_int_log',
                     isDynamic: true
                 });
 
-                logRecord.setValue('custrecord_ts_outb_int_log_destination', params.destination);
-                logRecord.setValue('custrecord_ts_outb_int_log_entity', params.entity);
-                logRecord.setValue('custrecord_ts_outb_int_log_method', params.method);
-                logRecord.setValue('custrecord_ts_outb_int_log_key', params.key);
-                logRecord.setValue('custrecord_ts_outb_int_log_request', JSON.stringify(params.request));
-                logRecord.setValue('custrecord_ts_outb_int_log_response', JSON.stringify(params.response));
-                logRecord.setValue('custrecord_ts_outb_int_log_status', params.status);
+                log.audit('Registro creado');
 
-                const logId = logRecord.save();
-                log.audit('Log guardado correctamente', logId);
+
+                try {
+                    logRecord.setValue('custrecord_ts_outb_int_log_destination', params.destination);
+                    logRecord.setValue('custrecord_ts_outb_int_log_entity', params.entity);
+                    logRecord.setValue('custrecord_ts_outb_int_log_method', params.method);
+                    logRecord.setValue('custrecord_ts_outb_int_log_key', params.key);
+                    logRecord.setValue('custrecord_ts_outb_int_log_request', JSON.stringify(params.request));
+                    logRecord.setValue('custrecord_ts_outb_int_log_response', JSON.stringify(params.response));
+                    logRecord.setValue('custrecord_ts_outb_int_log_status', params.status);
+                    log.audit('Campos seteados correctamente');
+                } catch (error) {
+                    log.error('Error al asignar campos', error);
+                }
+
+                try {
+                    const logId = logRecord.save();
+                    log.audit('Registro guardado con ID', logId);
+
+                } catch (error) {
+                    log.error('Error al guardar registro', error);
+                }
             } catch (e) {
                 log.error('Error al registrar integración', e);
             }
@@ -434,8 +450,6 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
                 log.error('Error general en saveRequest', e);
             }
         };
-
-
         */
 
 
