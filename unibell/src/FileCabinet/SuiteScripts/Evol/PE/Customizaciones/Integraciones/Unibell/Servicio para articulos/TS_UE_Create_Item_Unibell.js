@@ -38,6 +38,10 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
                 });
 
 
+                 const jerarquia = itemRecord.getValue('hierarchynode')
+                
+                 log.debug('Jerarquía del ítem', jerarquia);
+
                 const json = buildDynamicJson(itemRecord);
                 log.audit('Json generado', JSON.stringify(json, null, 2));
 
