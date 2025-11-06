@@ -4,19 +4,20 @@
  * @NApiVersion 2.1
  * @NScriptType UserEventScript
  */
-define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
+define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime'],
     /**
  * @param{http} http
  * @param{https} https
  * @param{log} log
  * @param{record} record
  * @param{search} search
+ * @param{runtime} runtime
  */
 
-    (http, https, log, record, search) => {
+    (http, https, log, record, search, runtime) => {
         const COMPANY_DEST = 'Unibell';
         const SYSTEM_DEST = 'Artículos';
-        const METHOD = 2;
+        const METHOD = '2';
 
 
         const afterSubmit = (context) => {
@@ -30,7 +31,6 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
                 // Buscar el tipo de item (Artículo inventariable, Artículo inventariable loteado y Artículo de ensamblaje loteado )
                 const recordType = resolveItemType(newRecord.type);
 
- 
                 const itemRecord = record.load({
                     type: recordType,
                     id: newRecord.id,
@@ -38,11 +38,8 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
                 });
 
 
-                 const jerarquia = itemRecord.getValue('hierarchynode')
-                
-                 log.debug('Jerarquía del ítem', jerarquia);
-
                 const json = buildDynamicJson(itemRecord);
+
                 log.audit('Json generado', JSON.stringify(json, null, 2));
 
                 // Obtiene la configuración del servicio (URL y token)
@@ -88,6 +85,21 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
                 log.audit('Item activo', `El ítem ID ${item.id} está activo. No se enviará al servicio.`);
                 return null;
             }
+            
+            let lineas = item.getLineCount({ sublistId: 'hierarchyversions' }); 
+            let hierarchyNode;
+            log.debug('Número de líneas en sublista "hierarchyversions": ', lineas);
+
+
+            for (let i = 0; i < lineas; i++) {
+                hierarchyNode = item.getSublistValue({
+                    sublistId: 'hierarchyversions',
+                    fieldId: 'hierarchynode',
+                    line: i
+                });
+                log.debug('Línea ' + i, 'hierarchynode: ' + hierarchyNode);
+            }
+
 
             const base = {
                 id: item.id,
@@ -160,16 +172,16 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search'],
                 incomeaccount: item.getValue('incomeaccount'),
                 taxschedule: item.getValue('taxschedule'),
                 custitem_pe_existence_type: item.getValue('custitem_pe_existence_type'),
-             //   custitem_pe_cod_existence_type: item.getValue('custitem_pe_cod_existence_type'),
-              //  custitem_pe_inventory_catalog: item.getValue('custitem_pe_inventory_catalog'),
+               custitem_pe_cod_existence_type: item.getValue('custitem_pe_cod_existence_type'),
+               custitem_pe_inventory_catalog: item.getValue('custitem_pe_inventory_catalog'),
                 custitem_pe_cod_inventory_catalog: item.getValue('custitem_pe_cod_inventory_catalog'),
                 custitem_pe_measurement_unit: item.getValue('custitem_pe_measurement_unit'),
                 custitem_pe_cod_measure_unit: item.getValue('custitem_pe_cod_measure_unit'),
                 custitem_pe_valuation_method: item.getValue('custitem_pe_valuation_method'),
-              //  custitem_pe_cod_valuation_method: item.getValue('custitem_pe_cod_valuation_method'),
+               custitem_pe_cod_valuation_method: item.getValue('custitem_pe_cod_valuation_method'),
                 custitem_pe_purchase_account: item.getValue('custitem_pe_purchase_account'),
                 custitem_pe_variation_account: item.getValue('custitem_pe_variation_account'),
-                hierarchynode: item.getValue('hierarchynode')
+                hierarchynode: hierarchyNode
             };
 
 

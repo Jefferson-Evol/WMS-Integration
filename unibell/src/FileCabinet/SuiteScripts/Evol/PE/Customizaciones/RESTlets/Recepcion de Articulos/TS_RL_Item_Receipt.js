@@ -99,15 +99,12 @@ define(['N/record', 'N/search', 'N/error', 'N/log', 'N/format'], function (recor
             return acc;
         }, {});
 
-        log.debug('itemMap', itemMap)
-
-        log.debug('itemReceipt ', itemReceipt);
-        log.debug('requestItems 1 ', requestItems);
+        log.debug('itemMap', itemMap);
 
         let lineCount = itemReceipt.getLineCount({ sublistId: 'item' });
-
         log.debug('lineCount', lineCount);
 
+        // Iterar por todas las líneas de la recepción de artículos
         const mappedLines = Array.from({ length: lineCount }, (_, i) => ({
             lineNumber: i,
             item: itemReceipt.getSublistValue({ sublistId: 'item', fieldId: 'item', line: i }),
@@ -132,17 +129,13 @@ define(['N/record', 'N/search', 'N/error', 'N/log', 'N/format'], function (recor
             // Si encontramos el artículo en requestItems, lo procesamos
             itemReceipt.selectLine({ sublistId: 'item', line: orderItem.lineNumber });
 
-            // Actualizamos los campos principales de la línea
             updateLineFields(itemReceipt, requestItem);
 
-            // Actualizamos los detalles de inventario solo si el artículo tiene inventario
             updateInventoryDetail(itemReceipt, requestItem);
 
-            // Confirmamos la línea
             itemReceipt.commitLine({ sublistId: 'item' });
         });
     };
-
 
 
 
@@ -153,7 +146,6 @@ define(['N/record', 'N/search', 'N/error', 'N/log', 'N/format'], function (recor
         itemReceipt.setCurrentSublistValue({ sublistId: 'item', fieldId: 'quantity', value: requestItem.quantity });
         itemReceipt.setCurrentSublistValue({ sublistId: 'item', fieldId: 'location', value: requestItem.location });
     };
-
 
     const updateInventoryDetail = (itemReceipt, requestItem) => {
         const invtType = itemReceipt.getCurrentSublistValue({ sublistId: 'item', fieldId: 'invttype' });
@@ -169,15 +161,12 @@ define(['N/record', 'N/search', 'N/error', 'N/log', 'N/format'], function (recor
             if (requestItem.inventorydetail && requestItem.inventorydetail.length > 0) {
                 addInventoryAssignment(inventoryDetail, requestItem);
             } else {
-                // Si no tiene detalles de inventario, logueamos que no tiene y simplemente se agrega el artículo sin inventario
                 log.debug("No se encontraron detalles de inventario para el artículo", requestItem.item);
             }
         } else {
-            // Si el artículo es de tipo "Service", no procesamos detalles de inventario
             log.debug("Artículo de tipo 'Service', no se procesarán detalles de inventario", requestItem.item);
         }
     };
-
 
     // Función para obtener o crear el subregistro de detalle de inventario
     const getOrCreateInventoryDetail = (itemReceipt) => {
@@ -203,7 +192,6 @@ define(['N/record', 'N/search', 'N/error', 'N/log', 'N/format'], function (recor
 
     // Función para agregar una nueva línea de inventario
     const addInventoryAssignment = (inventoryDetail, requestItem) => {
-        // Iteramos sobre los detalles de inventario (si los tiene) y los asignamos
         requestItem.inventorydetail.forEach(inventoryData => {
             inventoryDetail.selectNewLine({ sublistId: 'inventoryassignment' });
 
