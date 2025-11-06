@@ -2,13 +2,14 @@
  * @NApiVersion 2.1
  * @NScriptType UserEventScript
  */
-define(["N/error", "N/format", "N/log", "N/record", "N/search"], /**
+define(["N/error", "N/format", "N/log", "N/record", "N/search", "N/https", "N/http", 'N/runtime'], /**
  * @param{error} error
  * @param{format} format
  * @param{log} log
  * @param{record} record
  * @param{search} search
- */ (error, format, log, record, search) => {
+ * @param{runtime} runtime
+ */ (error, format, log, record, search, https, http, runtime) => {
     /**
      * Defines the function definition that is executed before record is loaded.
      * @param {Object} scriptContext
@@ -23,7 +24,7 @@ define(["N/error", "N/format", "N/log", "N/record", "N/search"], /**
     const SYSTEM_DEST = "Traslado de Inventario";
     const METHOD = "2";
 
-    const afterSubmit = (scriptContext) => {
+    const afterSubmit = (context) => {
       try {
         const { newRecord, type, UserEventType } = context;
 
@@ -33,12 +34,16 @@ define(["N/error", "N/format", "N/log", "N/record", "N/search"], /**
         log.audit("afterSubmit", `Procesando Traslado de Inventario ID: ${newRecord.id}`);
 
         let recordTransfer = record.load({
-          type: record.Type.INVENTORYTRANSFER,
+          type: record.Type.INVENTORY_TRANSFER,
           id: newRecord.id,
           isDynamic: true,
         });
 
-        const json = buildProviderJson(recordTransfer);
+        let items = getItems(recordTransfer);
+
+
+        const json = buildProviderJson(recordTransfer, items);
+
         log.audit('JSON generado', JSON.stringify(json, null, 2));
 
         // Obtiene configuración del servicio
@@ -67,114 +72,196 @@ define(["N/error", "N/format", "N/log", "N/record", "N/search"], /**
 
     // FUNCIONES 
 
-    const buildProviderJson = (provider) => {
+const getItems = (recordTransfer) => {
 
-      const base = {
-        id: recordProvider.id,
-        recordType: recordProvider.type,
-        tranid: recordProvider.getValue("tranid"),
-        trandate: recordProvider.getValue("trandate"),
-        memo: recordProvider.getValue("memo"),
-        location: recordProvider.getValue("location"),
-        transferlocation: recordProvider.getValue("transferlocation"),
-        subsidiary: recordProvider.getValue("subsidiary"),
-        department: recordProvider.getValue("department"),
-        class: recordProvider.getValue("class"),
-        cseg5: recordProvider.getValue("cseg5"),
-        custbody_uni_motivo_traslado: recordProvider.getValue(
-          "custbody_uni_motivo_traslado"
-        ),
+      let lineItems = recordTransfer.getLineCount({ sublistId: 'inventory' });
 
-        // Campos de item
-        item: recordProvider.getValue("item"),
-        units: recordProvider.getValue("units"),
-        quantityonhand: recordProvider.getValue("quantityonhand"),
+      log.audit('lineItems', lineItems);
 
-        // Detalle de inventario
-        inventorynumber: recordProvider.getValue("inventorynumber"), // ISSUEINVENTORYNUMBER
-        // Campo valtante de origen
-        inventorystatus: recordProvider.getValue("inventorystatus"),
-        toinventorystatus: recordProvider.getValue("toinventorystatus"),
-        quantity: recordProvider.getValue("quantity"),
 
-      }
+      let items = [];
 
-      return base;
-    };
+      for(let i = 0; i<lineItems; i++) {
+        recordTransfer.selectLine({ sublistId: 'inventory', line: i });
 
-    const getServiceConfig = () => {
-      try {
-        const res = [];
-        const searchObj = search.create({
-          type: 'customrecord_uni_serv_integ',
-          columns: [
-            'custrecord_uni_serv_integ_tok_traslado',
-            'custrecord_uni_serv_integ_link_traslado'
-          ]
+        const itemId = recordTransfer.getCurrentSublistValue({
+          sublistId: 'inventory',
+          fieldId: 'item'
         });
 
-        searchObj.run().each(result => {
-          res.push({
-            token: result.getValue('custrecord_uni_serv_integ_tok_traslado'),
-            url: result.getValue('custrecord_uni_serv_integ_link_traslado')
-          });
-          return true;
+        const description = recordTransfer.getCurrentSublistValue({
+          sublistId: 'inventory',
+          fieldId: 'description'
         });
 
-        if (res.length !== 1) throw 'Error: configuración del servicio inválida';
-        return res[0];
-
-      } catch (error) {
-        log.error('getServiceConfig', error);
-        throw error;
-      }
-    };
-
-    const sendToService = (config, json) => {
-      const headers = { 'Content-Type': 'application/json' };
-      if (config.token) headers['Authorization'] = 'Bearer ' + config.token;
-
-      const protocol = config.url.startsWith('https') ? https : http;
-
-      try {
-        const response = protocol.post({
-          url: config.url,
-          body: JSON.stringify(json),
-          headers
-        });
-        log.audit('Respuesta del servicio', response.body);
-        return response;
-      } catch (err) {
-        log.error('Error al enviar al servicio', err);
-        throw err;
-      }
-    };
-
-
-    const saveIntegrationLog = (params) => {
-      try {
-        log.audit('saveIntegrationLog - Inicio', JSON.stringify(params));
-
-        const logRecord = record.create({
-          type: 'customrecord_ts_outb_int_log',
-          isDynamic: true
+        const units = recordTransfer.getCurrentSublistValue({
+          sublistId: 'inventory',
+          fieldId: 'units'
         });
 
-        logRecord.setValue('custrecord_ts_outb_int_log_destination', params.destination);
-        logRecord.setValue('custrecord_ts_outb_int_log_entity', params.entity);
-        logRecord.setValue('custrecord_ts_outb_int_log_method', params.method);
-        logRecord.setValue('custrecord_ts_outb_int_log_key', params.key);
-        logRecord.setValue('custrecord_ts_outb_int_log_request', JSON.stringify(params.request));
-        logRecord.setValue('custrecord_ts_outb_int_log_response', JSON.stringify(params.response));
-        logRecord.setValue('custrecord_ts_outb_int_log_status', params.status);
+        const quantityOnHand = recordTransfer.getCurrentSublistValue({
+          sublistId: 'inventory',
+          fieldId: 'quantityonhand'
+        });
 
-        const logId = logRecord.save();
-        log.audit('Trazabilidad registrada', `ID: ${logId}`);
+        const inventoryDetail = recordTransfer.getCurrentSublistSubrecord({
+          sublistId: 'inventory',
+          fieldId: 'inventorydetail'
+        });
 
-      } catch (e) {
-        log.error('Error en saveIntegrationLog', e);
+        const lineDetails = [];
+
+        if (inventoryDetail) {
+          const lineCount = inventoryDetail.getLineCount({ sublistId: 'inventoryassignment' });
+
+          for (let j = 0; j < lineCount; j++) {
+            inventoryDetail.selectLine({ sublistId: 'inventoryassignment', line: j });
+
+            const detail = {
+              issueinventorynumber: inventoryDetail.getCurrentSublistValue({
+                sublistId: 'inventoryassignment',
+                fieldId: 'issueinventorynumber'
+              }),
+              inventorystatus: inventoryDetail.getCurrentSublistValue({
+                sublistId: 'inventoryassignment',
+                fieldId: 'inventorystatus'
+              }),
+              toinventorystatus: inventoryDetail.getCurrentSublistValue({
+                sublistId: 'inventoryassignment',
+                fieldId: 'toinventorystatus'
+              }),
+              expirationdate: inventoryDetail.getCurrentSublistValue({
+                sublistId: 'inventoryassignment',
+                fieldId: 'expirationdate'
+              }),
+              quantity: inventoryDetail.getCurrentSublistValue({
+                sublistId: 'inventoryassignment',
+                fieldId: 'quantity'
+              })
+            };
+
+            lineDetails.push(detail);
+
+            inventoryDetail.commitLine({ sublistId: 'inventoryassignment' });
+          }
+        }
+
+        items.push({
+          item: itemId,
+          description,
+          units,
+          quantityonhand: quantityOnHand,
+          details: lineDetails
+        });
+
+        recordTransfer.commitLine({ sublistId: 'inventory' });
       }
-    };
+          log.audit('Detalle completo de ítems', JSON.stringify(items, null, 2));
 
-    return { afterSubmit };
+      return items;
+};
+
+
+  
+
+
+const buildProviderJson = (recordTransfer, items) => {
+
+  let userObj = runtime.getCurrentUser();
+  log.debug('Script ID Usuario: ', userObj);
+
+  const base = {
+    id: recordTransfer.id,
+    recordType: recordTransfer.type,
+    tranid: recordTransfer.getValue("tranid"),
+    trandate: recordTransfer.getValue("trandate"),
+    memo: recordTransfer.getValue("memo"),
+    location: recordTransfer.getValue("location"),
+    transferlocation: recordTransfer.getValue("transferlocation"),
+    subsidiary: recordTransfer.getValue("subsidiary"),
+    department: recordTransfer.getValue("department"),
+    class: recordTransfer.getValue("class"),
+    cseg5: recordTransfer.getValue("cseg5"),
+    custbody_uni_motivo_traslado: recordTransfer.getValue("custbody_uni_motivo_traslado"),
+    items: items,
+    user: userObj.name,
+  }
+  return base;
+};
+
+const getServiceConfig = () => {
+  try {
+    const res = [];
+    const searchObj = search.create({
+      type: 'customrecord_uni_serv_integ',
+      columns: [
+        'custrecord_uni_serv_integ_tok_traslado',
+        'custrecord_uni_serv_integ_link_traslado'
+      ]
+    });
+
+    searchObj.run().each(result => {
+      res.push({
+        token: result.getValue('custrecord_uni_serv_integ_tok_traslado'),
+        url: result.getValue('custrecord_uni_serv_integ_link_traslado')
+      });
+      return true;
+    });
+
+    if (res.length !== 1) throw 'Error: configuración del servicio inválida';
+    return res[0];
+
+  } catch (error) {
+    log.error('getServiceConfig', error);
+    throw error;
+  }
+};
+
+const sendToService = (config, json) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (config.token) headers['Authorization'] = 'Bearer ' + config.token;
+
+  const protocol = config.url.startsWith('https') ? https : http;
+
+  try {
+    const response = protocol.post({
+      url: config.url,
+      body: JSON.stringify(json),
+      headers
+    });
+    log.audit('Respuesta del servicio', response.body);
+    return response;
+  } catch (err) {
+    log.error('Error al enviar al servicio', err);
+    throw err;
+  }
+};
+
+
+const saveIntegrationLog = (params) => {
+  try {
+    log.audit('saveIntegrationLog - Inicio', JSON.stringify(params));
+
+    const logRecord = record.create({
+      type: 'customrecord_ts_outb_int_log',
+      isDynamic: true
+    });
+
+    logRecord.setValue('custrecord_ts_outb_int_log_destination', params.destination);
+    logRecord.setValue('custrecord_ts_outb_int_log_entity', params.entity);
+    logRecord.setValue('custrecord_ts_outb_int_log_method', params.method);
+    logRecord.setValue('custrecord_ts_outb_int_log_key', params.key);
+    logRecord.setValue('custrecord_ts_outb_int_log_request', JSON.stringify(params.request));
+    logRecord.setValue('custrecord_ts_outb_int_log_response', JSON.stringify(params.response));
+    logRecord.setValue('custrecord_ts_outb_int_log_status', params.status);
+
+    const logId = logRecord.save();
+    log.audit('Trazabilidad registrada', `ID: ${logId}`);
+
+  } catch (e) {
+    log.error('Error en saveIntegrationLog', e);
+  }
+};
+
+return { afterSubmit };
   });

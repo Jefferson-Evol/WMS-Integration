@@ -4,17 +4,18 @@
  * @NApiVersion 2.1
  * @NScriptType UserEventScript
  */
-define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime'],
+define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/url'],
     /**
- * @param{http} http
- * @param{https} https
- * @param{log} log
- * @param{record} record
- * @param{search} search
- * @param{runtime} runtime
+ * @param {http} http
+ * @param {https} https
+ * @param {log} log
+ * @param {record} record
+ * @param {search} search
+ * @param {runtime} runtime
+ * @param {url} url
  */
 
-    (http, https, log, record, search, runtime) => {
+    (http, https, log, record, search, runtime, url) => {
         const COMPANY_DEST = 'Unibell';
         const SYSTEM_DEST = 'Artículos';
         const METHOD = '2';
@@ -82,7 +83,7 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime'],
         const buildDynamicJson = (item) => {
             const isInactive = item.getValue('isinactive');
             if (isInactive) {
-                log.audit('Item activo', `El ítem ID ${item.id} está activo. No se enviará al servicio.`);
+                log.audit('Item desactivo', `El ítem ID ${item.id} está desactivo. No se enviará al servicio.`);
                 return null;
             }
             
@@ -101,9 +102,17 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime'],
             }
 
 
+            let userObj = runtime.getCurrentUser();
+            log.debug('Script ID Usuario: ', userObj);
+
+            const host = url.resolveDomain({ hostType: url.HostType.APPLICATION });
+            log.debug('Host: ', host);
+
+
             const base = {
                 id: item.id,
                 recordType: item.type,
+                isinactive: isInactive,
                 itemid: item.getValue('itemid'),
                 displayname: item.getValue('displayname'),
                 upccode: item.getValue('upccode'),
@@ -181,7 +190,10 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime'],
                custitem_pe_cod_valuation_method: item.getValue('custitem_pe_cod_valuation_method'),
                 custitem_pe_purchase_account: item.getValue('custitem_pe_purchase_account'),
                 custitem_pe_variation_account: item.getValue('custitem_pe_variation_account'),
-                hierarchynode: hierarchyNode
+                hierarchynode: hierarchyNode,
+                user: userObj.name,
+                role: userObj.roleId,
+                host: host
             };
 
 
@@ -286,187 +298,7 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime'],
         };
 
 
-
         return { afterSubmit }
 
 });
-
-
-
-
-
-
-
-        /*    ANTES 
-
-
-        const companiaDestino = 'Unibell';
-        const sistemaDestino = 'Artículos';
-        const metodo = 'POST';
-
-        const afterSubmit = (scriptContext) => {
-            try {
-
-                if (scriptContext.type === scriptContext.UserEventType.CREATE || scriptContext.type === scriptContext.UserEventType.EDIT || scriptContext.type === scriptContext.UserEventType.COPY) {
-
-                    let newRecord = scriptContext.newRecord;
-
-
-                    LOTNUMBEREDASSEMBLYITEM
-                    LOTNUMBEREDINVENTORYITEM
-                    INVENTORYITEM 
-                
- 
-                    let recordItem = record.load({
-                        type: record.Type.LOT_NUMBERED_INVENTORY_ITEM,
-                        id: newRecord.id,
-                        isDynamic: true
-                    })
- 
-                    // de manera dinámica
-                    let jsonDynamic = {
-                        "id": recordItem.id,
-                        "itemid": recordItem.getValue('itemid'),
-                        "displayname": recordItem.getValue('displayname'),
-                        "custitem_uni_tipo_inventario": recordItem.getValue('custitem_uni_tipo_inventario'),
-                        "custitem_uni_familia": recordItem.getValue('custitem_uni_familia'),
-                        "custitem_uni_sub_familia": recordItem.getValue('custitem_uni_sub_familia'),
-                        "recordType": recordItem.type,
-                        "stockunit": recordItem.getValue('stockunit'),
-                        "custitem_uni_status_item": recordItem.getValue('custitem_uni_status_item'),
-                        "taxschedule": recordItem.getValue('taxschedule'),
-                        "custitem_uni_inci": recordItem.getValue('custitem_uni_inci'),
-                        "custitem_uni_unid_caja": recordItem.getValue('custitem_uni_unid_caja'),
-                        "custitem_uni_fiscalizado": recordItem.getValue('custitem_uni_fiscalizado'),
-                        "purchasedescription": recordItem.getValue('purchasedescription'),
-                        "custitem_uni_clas_inventario": recordItem.getValue('custitem_uni_clas_inventario')
-                    }
-
-
-                    log.audit('JSON estático a enviar', JSON.stringify(jsonDynamic, null, 2));
-
-                    
-                    
-
-
-                    let config = getUrlServiceDetails();
-
-                    const headers = {
-                        'Content-Type': 'application/json'
-                    };
-
-                    if (config.token) headers['Authorization'] = 'Bearer ' + config.token;
-
-                    const protocol = config.url.startsWith('https') ? https : http;
-
-                    let response;
-
-                    try {
-                        const response = protocol.post({
-                            url: config.url,
-                            body: JSON.stringify(jsonDynamic),
-                            headers
-                        });
-                        log.audit('Respuesta', response.body);
-                    } catch (httpError) {
-                        log.error('Error al enviar al servicio', httpError);
-                    }
-
-
-                    if (response) {
-                        saveRequest({
-                            destination: companiaDestino,
-                            entity: sistemaDestino,
-                            method: metodo,
-                            key: scriptContext.newRecord.id,
-                            request: jsonDynamic,
-                            response: JSON.parse(response.body || '{}'),
-                            status: response.code
-                        });
-                    }
-
-                }
-
-            } catch (error) {
-                log.error('Error en afterSubmit', error);
-            }
-
-        }
-
-
-        // FUNCIONES
-        const getUrlServiceDetails = () => {
-            try {
-                let res = [];
-                var searchObj = search.create({
-                    type: "customrecord_uni_serv_integ",
-                    filters:
-                        [
-                        ],
-                    columns:
-                        [
-                            search.createColumn({ name: "custrecord_uni_serv_integ_tok_articulos", label: "UNI - Token Artículos" }),
-                            search.createColumn({ name: "custrecord_uni_serv_integ_link_articulos", label: "UNI - Servicio Artículos" })
-                        ]
-                });
-
-                let searchResultCount = searchObj.runPaged().count;
-                log.debug("searchObj  result count", searchResultCount);
-
-
-                searchObj.run().each(result => {
-                    res.push({
-                        token: result.getValue('custrecord_uni_serv_integ_tok_articulos'),
-                        url: result.getValue('custrecord_uni_serv_integ_link_articulos')
-                    });
-                    return true;
-                });
-
-                if (res.length !== 1) throw 'Error en configuración del servicio';
-
-                return res[0];
-
-            } catch (error) {
-                log.error('getUrlServiceDetails', error);
-                throw error;
-            }
-        }
-
-        const saveRequest = (params) => {
-            try {
-                log.audit('saveRequest - Inicio', JSON.stringify(params));
-
-                const req = record.create({
-                    type: 'customrecord_ts_outb_int_log',
-                    isDynamic: true
-                });
-                log.audit('Paso 1', 'Registro creado');
-
-                try {
-                    req.setValue({ fieldId: 'custrecord_ts_outb_int_log_destination', value: params.destination });
-                    req.setValue({ fieldId: 'custrecord_ts_outb_int_log_entity', value: params.entity });
-                    req.setValue({ fieldId: 'custrecord_ts_outb_int_log_method', value: params.method });
-                    req.setValue({ fieldId: 'custrecord_ts_outb_int_log_key', value: params.key });
-                    req.setValue({ fieldId: 'custrecord_ts_outb_int_log_request', value: JSON.stringify(params.request) });
-                    req.setValue({ fieldId: 'custrecord_ts_outb_int_log_response', value: JSON.stringify(params.response) });
-                    req.setValue({ fieldId: 'custrecord_ts_outb_int_log_status', value: params.status });
-                    log.audit('Paso 2', 'Campos seteados correctamente');
-                } catch (setErr) {
-                    log.error('Error al asignar campos', setErr);
-                }
-
-                try {
-                    const idLog = req.save();
-                    log.audit('Paso 3', 'Registro guardado con ID: ' + idLog);
-                } catch (saveErr) {
-                    log.error('Error al guardar registro', saveErr);
-                }
-
-            } catch (e) {
-                log.error('Error general en saveRequest', e);
-            }
-        };
-        */
-
-
 
