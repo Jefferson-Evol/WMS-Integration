@@ -85,6 +85,8 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
                 altname: provider.getValue('altname'),
                 companyname: provider.getValue('companyname'),
                 isperson: provider.getValue('isperson'),
+                comments : provider.getValue('comments'),
+                url: provider.getValue('url'),
                 category: provider.getValue('category'),
                 email: provider.getValue('email'),
                 phone: provider.getValue('phone'),
@@ -141,7 +143,6 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
             if (isPerson !== "F") {
                 base.firstname = provider.getValue('firstname');
                 base.title = provider.getValue('title');
-                base.comments = provider.getValue('comments');
                 base.custentity_pe_ap_paterno = provider.getValue('custentity_pe_ap_paterno');
                 base.custentity_pe_ap_materno = provider.getValue('custentity_pe_ap_materno');
             }
