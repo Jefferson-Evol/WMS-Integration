@@ -2,21 +2,21 @@
  * @NApiVersion 2.1
  * @NScriptType UserEventScript
  */
-define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/url'],
+define(['N/http', 'N/https', 'N/log', 'N/record', 'N/runtime', 'N/search'],
     /**
-     * @param {http} http
-     * @param {https} https
-     * @param {log} log
-     * @param {record} record
-     * @param {search} search
-     * @param {runtime} runtime
-     * @param {url} url
-     */
-    (http, https, log, record, search, runtime, url) => {
+ * @param{http} http
+ * @param{https} https
+ * @param{log} log
+ * @param{record} record
+ * @param{runtime} runtime
+ * @param{search} search
+ */
+    (http, https, log, record, runtime, search) => {
 
         const COMPANY_DEST = 'Unibell';
-        const SYSTEM_DEST = 'Proveedor';
+        const SYSTEM_DEST = 'Artículo recepcionado';
         const METHOD = '2';
+
 
         const afterSubmit = (context) => {
             try {
@@ -27,15 +27,15 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
 
                 log.audit('afterSubmit', `Procesando proveedor ID: ${newRecord.id}`);
 
-                const providerRecord = record.load({
-                    type: record.Type.VENDOR,
+                const itemRecord = record.load({
+                    type: record.Type.ITEM_RECEIPT,
                     id: newRecord.id,
                     isDynamic: true
                 });
 
 
 
-                const json = buildProviderJson(providerRecord);
+                const json = buildProviderJson(itemRecord);
                 log.audit('JSON generado', JSON.stringify(json, null, 2));
 
                 // Obtiene configuración del servicio
@@ -49,7 +49,7 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
                     destination: COMPANY_DEST,
                     entity: SYSTEM_DEST,
                     method: METHOD,
-                    key: providerRecord.id,
+                    key: itemRecord.id,
                     request: json,
                     response: response.body ? JSON.parse(response.body) : {},
                     status: response.code
@@ -58,14 +58,18 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
             } catch (error) {
                 log.error('Error en afterSubmit', error);
             }
-        };
 
 
-        const buildProviderJson = (provider) => {
 
-            const isInactive = provider.getValue('isinactive');
+        }
+
+        //FUNCIONES
+
+        const buildProviderJson = (itemRecord) => {
+
+            const isInactive = itemRecord.getValue('isinactive');
             if (isInactive) {
-                log.audit('Proveedor desactivo', `El proveedor ID ${provider.id} está desactivo. No se enviará al servicio.`);
+                log.audit('Proveedor desactivo', `El proveedor ID ${itemRecord.id} está desactivo. No se enviará al servicio.`);
                 return null;
             }
 
@@ -78,60 +82,47 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
 
 
             const base = {
-                id: provider.id,
+                id: itemRecord.id,
                 isinactive: isInactive,
-                recordType: provider.type,
-                entityid: provider.getValue('entityid'),
-                altname: provider.getValue('altname'),
-                companyname: provider.getValue('companyname'),
-                isperson: provider.getValue('isperson'),
-                comments : provider.getValue('comments'),
-                url: provider.getValue('url'),
-                category: provider.getValue('category'),
-                email: provider.getValue('email'),
-                phone: provider.getValue('phone'),
-                subsidiary: provider.getValue('subsidiary'),
+                recordType: itemRecord.type,
+                entityid: itemRecord.getValue('entityid'),
+                altname: itemRecord.getValue('altname'),
+                companyname: itemRecord.getValue('companyname'),
+                isperson: itemRecord.getValue('isperson'),
+                comments: itemRecord.getValue('comments'),
+                url: itemRecord.getValue('url'),
+                category: itemRecord.getValue('category'),
+                email: itemRecord.getValue('email'),
+                phone: itemRecord.getValue('phone'),
+                subsidiary: itemRecord.getValue('subsidiary'),
 
-                custentity_uni_grupo_de_proveedor: provider.getValue('custentity_uni_grupo_de_proveedor'),
-                custentity_pe_vendor_name: provider.getValue('custentity_pe_vendor_name'),
-                custentity_pe_type_of_person: provider.getValue('custentity_pe_type_of_person'),
-                custentity_pe_document_number: provider.getValue('custentity_pe_document_number'),
-                vatregnumber: provider.getValue('vatregnumber'),
-                custentity_pe_entity_country: provider.getValue('custentity_pe_entity_country'),
-                custentity_pe_payment_method: provider.getValue('custentity_pe_payment_method'),
-                custentity_pe_detraccion_account: provider.getValue('custentity_pe_detraccion_account'),
-                custentity_pe_link_btw_taxpayer_foreign: provider.getValue('custentity_pe_link_btw_taxpayer_foreign'),
+                custentity_uni_grupo_de_proveedor: itemRecord.getValue('custentity_uni_grupo_de_proveedor'),
+                custentity_pe_vendor_name: itemRecord.getValue('custentity_pe_vendor_name'),
+                custentity_pe_type_of_person: itemRecord.getValue('custentity_pe_type_of_person'),
+                custentity_pe_document_number: itemRecord.getValue('custentity_pe_document_number'),
+                vatregnumber: itemRecord.getValue('vatregnumber'),
+                custentity_pe_entity_country: itemRecord.getValue('custentity_pe_entity_country'),
+                custentity_pe_payment_method: itemRecord.getValue('custentity_pe_payment_method'),
+                custentity_pe_detraccion_account: itemRecord.getValue('custentity_pe_detraccion_account'),
+                custentity_pe_link_btw_taxpayer_foreign: itemRecord.getValue('custentity_pe_link_btw_taxpayer_foreign'),
 
-                custentity_pe_is_wh_: provider.getValue('custentity_pe_is_wh_'),
-                custentity_pe_is_agent_perception: provider.getValue('custentity_pe_is_agent_perception'),
-                custentity_pe_sujeto_retencion: provider.getValue('custentity_pe_sujeto_retencion'),
-                custentity_pe_is_good_contributor: provider.getValue('custentity_pe_is_good_contributor'),
-                custentity_pe_est_contrib: provider.getValue('custentity_pe_est_contrib'),
-                custentity_pe_cond_contri_prov: provider.getValue('custentity_pe_cond_contri_prov'),
+                custentity_pe_is_wh_: itemRecord.getValue('custentity_pe_is_wh_'),
+                custentity_pe_is_agent_perception: itemRecord.getValue('custentity_pe_is_agent_perception'),
+                custentity_pe_sujeto_retencion: itemRecord.getValue('custentity_pe_sujeto_retencion'),
+                custentity_pe_is_good_contributor: itemRecord.getValue('custentity_pe_is_good_contributor'),
+                custentity_pe_est_contrib: itemRecord.getValue('custentity_pe_est_contrib'),
+                custentity_pe_cond_contri_prov: itemRecord.getValue('custentity_pe_cond_contri_prov'),
 
-                legalname: provider.getValue('legalname'),
-                payablesaccount: provider.getValue('payablesaccount'),
-                currency: provider.getValue('currency'),
-                incoterm: provider.getValue('incoterm'),
-                custentity_4601_defaultwitaxcode: provider.getValue('custentity_4601_defaultwitaxcode'),
-                terms: provider.getValue('terms'),
-                workcalendar: provider.getValue('workcalendar'),
+                legalname: itemRecord.getValue('legalname'),
+                payablesaccount: itemRecord.getValue('payablesaccount'),
+                currency: itemRecord.getValue('currency'),
+                incoterm: itemRecord.getValue('incoterm'),
+                custentity_4601_defaultwitaxcode: itemRecord.getValue('custentity_4601_defaultwitaxcode'),
 
-                // Dirección principal
-                defaultshipping: provider.getValue('defaultshipping'),
-                defaultbilling: provider.getValue('defaultbilling'),
-                defaultaddress: cleanAddress(provider.getValue('defaultaddress')),
-                country: provider.getValue('country'),
-                addressee: provider.getValue('addressee'),
-                addr1: provider.getValue('addr1'),
-                addr2: provider.getValue('addr2'),
-                zip: provider.getValue('zip'),
-                custrecord_uni_departamento: provider.getValue('custrecord_uni_departamento'),
-                custrecord_uni_provincia: provider.getValue('custrecord_uni_provincia'),
-                custrecord_uni_distrito: provider.getValue('custrecord_uni_distrito'),
-                custrecord_uni_ubigeo: provider.getValue('custrecord_uni_ubigeo'),
-                custrecord_uni_latitud: provider.getValue('custrecord_uni_latitud'),
-                custrecord_uni_longitud: provider.getValue('custrecord_uni_longitud'),
+
+
+            
+                
                 user: userObj.name,
                 role: userObj.roleId,
                 host: host
@@ -232,7 +223,7 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
         };
 
 
-        
-        return { afterSubmit };
+
+        return { afterSubmit }
 
     });
