@@ -69,6 +69,35 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
                 return null;
             }
 
+            let lineas = provider.getLineCount({ sublistId: 'addressbook' });
+
+            let defaultBilling; 
+            let defaultShipping;
+
+            log.debug('Número de direcciones', lineas);
+
+            for (let i = 0; i < lineas; i++) {
+                defaultBilling = provider.getSublistValue({
+                    sublistId: 'addressbook',
+                    fieldId: 'defaultbilling',
+                    line: i
+                });
+
+                log.debug(`Línea ${i} - defaultbilling: `, defaultBilling);
+
+
+                defaultShipping = provider.getSublistValue({
+                    sublistId: 'addressbook',
+                    fieldId: 'defaultshipping',
+                    line: i
+                });
+
+                log.debug(`Línea ${i} - defaultshipping: `, defaultShipping);
+
+            }
+
+
+
 
             let userObj = runtime.getCurrentUser();
             log.debug('Script ID: ', userObj);
@@ -96,12 +125,13 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
                 custentity_pe_vendor_name: provider.getValue('custentity_pe_vendor_name'),
                 custentity_pe_type_of_person: provider.getValue('custentity_pe_type_of_person'),
                 custentity_pe_document_number: provider.getValue('custentity_pe_document_number'),
+                custentity_pe_document_type: provider.getValue('custentity_pe_document_type'),
                 vatregnumber: provider.getValue('vatregnumber'),
                 custentity_pe_entity_country: provider.getValue('custentity_pe_entity_country'),
                 custentity_pe_payment_method: provider.getValue('custentity_pe_payment_method'),
                 custentity_pe_detraccion_account: provider.getValue('custentity_pe_detraccion_account'),
                 custentity_pe_link_btw_taxpayer_foreign: provider.getValue('custentity_pe_link_btw_taxpayer_foreign'),
-
+                custentity_pe_tipo_contribuyente: provider.getValue('custentity_pe_tipo_contribuyente'),
                 custentity_pe_is_wh_: provider.getValue('custentity_pe_is_wh_'),
                 custentity_pe_is_agent_perception: provider.getValue('custentity_pe_is_agent_perception'),
                 custentity_pe_sujeto_retencion: provider.getValue('custentity_pe_sujeto_retencion'),
@@ -118,8 +148,13 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/search', 'N/runtime', 'N/ur
                 workcalendar: provider.getValue('workcalendar'),
 
                 // Dirección principal
-                defaultshipping: provider.getValue('defaultshipping'),
-                defaultbilling: provider.getValue('defaultbilling'),
+
+                defaultshipping: defaultShipping,
+                defaultbilling: defaultBilling,
+
+                // defaultshipping: provider.getValue('defaultshipping'),
+                // defaultbilling: provider.getValue('defaultbilling'),
+
                 defaultaddress: cleanAddress(provider.getValue('defaultaddress')),
                 country: provider.getValue('country'),
                 addressee: provider.getValue('addressee'),

@@ -25,7 +25,7 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/runtime', 'N/search'],
                 // Solo ejecuta en creación, edición o copia
                 if (![UserEventType.CREATE, UserEventType.EDIT, UserEventType.COPY].includes(type)) return;
 
-                log.audit('afterSubmit', `Procesando proveedor ID: ${newRecord.id}`);
+                log.audit('afterSubmit', `Procesando recepción de artículo ID: ${newRecord.id}`);
 
                 const itemRecord = record.load({
                     type: record.Type.ITEM_RECEIPT,
@@ -33,9 +33,10 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/runtime', 'N/search'],
                     isDynamic: true
                 });
 
+                let items = getItems(itemRecord);
 
 
-                const json = buildProviderJson(itemRecord);
+                const json = buildProviderJson(itemRecord, items);
                 log.audit('JSON generado', JSON.stringify(json, null, 2));
 
                 // Obtiene configuración del servicio
@@ -65,87 +66,97 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/runtime', 'N/search'],
 
         //FUNCIONES
 
-        const buildProviderJson = (itemRecord) => {
+        const getItems = (itemRecord) => {
 
-            const isInactive = itemRecord.getValue('isinactive');
-            if (isInactive) {
-                log.audit('Proveedor desactivo', `El proveedor ID ${itemRecord.id} está desactivo. No se enviará al servicio.`);
-                return null;
+            let lineItems = itemRecord.getLineCount({ sublistId: 'item' });
+
+            log.audit('lineItems', lineItems);
+
+            let items = [];
+
+            for (let i = 0; i < lineItems; i++) {
+                itemRecord.selectLine({ sublistId: 'item', line: i });
+
+                const binitem = itemRecord.getCurrentSublistValue({ sublistId: 'item', fieldId: 'binitem' });
+                const item = itemRecord.getCurrentSublistValue({ sublistId: 'item', fieldId: 'item' });
+                const quantity = itemRecord.getCurrentSublistValue({ sublistId: 'item', fieldId: 'quantity' });
+                const inventoryDetail = itemRecord.getCurrentSublistValue({ sublistId: 'item', fieldId: 'inventorydetail' });
+
+                let lineDetails = [];
+
+                if (inventoryDetail) {
+
+                    let lineCount = inventoryDetail.getLineCount({ sublistId: 'inventoryassignment' });
+
+                    for (let j = 0; j < lineCount; j++) {
+                        inventoryDetail.selectLine({ sublistId: 'inventoryassignment', line: j });
+
+                        const detail = {
+                            inventorynumber: inventoryDetail.getCurrentSublistValue({ sublistId: 'inventoryassignment', fieldId: 'inventorynumber' }),
+                            status: inventoryDetail.getCurrentSublistValue({ sublistId: 'inventoryassignment', fieldId: 'status' }),
+                            binnumber: inventoryDetail.getCurrentSublistValue({ sublistId: 'inventoryassignment', fieldId: 'binnumber' }),
+                            expirationdate: inventoryDetail.getCurrentSublistValue({ sublistId: 'inventoryassignment', fieldId: 'expirationdate' }),
+                            quantity: inventoryDetail.getCurrentSublistValue({ sublistId: 'inventoryassignment', fieldId: 'quantity' }),
+                            custitemnumber_uni_cant_bulto: inventoryDetail.getCurrentSublistValue({ sublistId: 'inventoryassignment', fieldId: 'custitemnumber_uni_cant_bulto' }),
+                            custitemnumber_uni_frac_bulto: inventoryDetail.getCurrentSublistValue({ sublistId: 'inventoryassignment', fieldId: 'custitemnumber_uni_frac_bulto' }),
+                            custitemnumber_uni_nro_bulto: inventoryDetail.getCurrentSublistValue({ sublistId: 'inventoryassignment', fieldId: 'custitemnumber_uni_nro_bulto' })
+
+                        }
+
+                        lineDetails.push(detail);
+
+                        inventoryDetail.commitLine({ sublistId: 'inventoryassignment' });
+
+                    }
+                }
+
+
+                items.push({
+                    binitem,
+                    item,
+                    quantity,
+                    detail: lineDetails
+                })
+
             }
 
+            itemRecord.commitLine({ sublistId: 'item' });
 
-            let userObj = runtime.getCurrentUser();
-            log.debug('Script ID: ', userObj);
+            return items;
+        }
 
-            const host = url.resolveDomain({ hostType: url.HostType.APPLICATION });
-            log.debug('Host: ', host);
 
+
+
+        const buildProviderJson = (itemRecord, items) => {
 
             const base = {
                 id: itemRecord.id,
-                isinactive: isInactive,
                 recordType: itemRecord.type,
-                entityid: itemRecord.getValue('entityid'),
-                altname: itemRecord.getValue('altname'),
-                companyname: itemRecord.getValue('companyname'),
-                isperson: itemRecord.getValue('isperson'),
-                comments: itemRecord.getValue('comments'),
-                url: itemRecord.getValue('url'),
-                category: itemRecord.getValue('category'),
-                email: itemRecord.getValue('email'),
-                phone: itemRecord.getValue('phone'),
-                subsidiary: itemRecord.getValue('subsidiary'),
-
-                custentity_uni_grupo_de_proveedor: itemRecord.getValue('custentity_uni_grupo_de_proveedor'),
-                custentity_pe_vendor_name: itemRecord.getValue('custentity_pe_vendor_name'),
-                custentity_pe_type_of_person: itemRecord.getValue('custentity_pe_type_of_person'),
-                custentity_pe_document_number: itemRecord.getValue('custentity_pe_document_number'),
-                vatregnumber: itemRecord.getValue('vatregnumber'),
-                custentity_pe_entity_country: itemRecord.getValue('custentity_pe_entity_country'),
-                custentity_pe_payment_method: itemRecord.getValue('custentity_pe_payment_method'),
-                custentity_pe_detraccion_account: itemRecord.getValue('custentity_pe_detraccion_account'),
-                custentity_pe_link_btw_taxpayer_foreign: itemRecord.getValue('custentity_pe_link_btw_taxpayer_foreign'),
-
-                custentity_pe_is_wh_: itemRecord.getValue('custentity_pe_is_wh_'),
-                custentity_pe_is_agent_perception: itemRecord.getValue('custentity_pe_is_agent_perception'),
-                custentity_pe_sujeto_retencion: itemRecord.getValue('custentity_pe_sujeto_retencion'),
-                custentity_pe_is_good_contributor: itemRecord.getValue('custentity_pe_is_good_contributor'),
-                custentity_pe_est_contrib: itemRecord.getValue('custentity_pe_est_contrib'),
-                custentity_pe_cond_contri_prov: itemRecord.getValue('custentity_pe_cond_contri_prov'),
-
-                legalname: itemRecord.getValue('legalname'),
-                payablesaccount: itemRecord.getValue('payablesaccount'),
+                tranid: itemRecord.getValue('tranid'),
+                entity: itemRecord.getValue('entity'),
+                createdfrom: itemRecord.getValue('createdfrom'),
+                trandate: itemRecord.getValue('trandate'),
+                memo: itemRecord.getValue('memo'),
                 currency: itemRecord.getValue('currency'),
-                incoterm: itemRecord.getValue('incoterm'),
-                custentity_4601_defaultwitaxcode: itemRecord.getValue('custentity_4601_defaultwitaxcode'),
-
-
-
-            
-                
-                user: userObj.name,
-                role: userObj.roleId,
-                host: host
+                subsidiary: itemRecord.getValue('subsidiary'),
+                custbody_pe_document_type: itemRecord.getValue('email'),
+                custbody_pe_serie_cxp: itemRecord.getValue('custbody_pe_serie_cxp'),
+                custbody_pe_number: itemRecord.getValue('custbody_pe_number'),
+                custbody_uni_origen_de_compra: itemRecord.getValue('custbody_uni_origen_de_compra'),
+                custbody_uni_nro_expediente: itemRecord.getValue('custbody_uni_nro_expediente'),
+                custbody_uni_nro_de_embarque: itemRecord.getValue('custbody_uni_nro_de_embarque'),
+                custbody_uni_tipo_de_expediente: itemRecord.getValue('custbody_uni_tipo_de_expediente'),
+                items: items
             }
 
 
-            const isPerson = provider.getValue('isperson');
-            // Si es persona natural
-            if (isPerson !== "F") {
-                base.firstname = provider.getValue('firstname');
-                base.title = provider.getValue('title');
-                base.custentity_pe_ap_paterno = provider.getValue('custentity_pe_ap_paterno');
-                base.custentity_pe_ap_materno = provider.getValue('custentity_pe_ap_materno');
-            }
+
 
             return base;
         };
 
 
-        const cleanAddress = (address) => {
-            if (!address) return '';
-            return address.replace(/[\r\n]+/g, ' ').trim();
-        };
 
         const getServiceConfig = () => {
             try {
@@ -153,15 +164,15 @@ define(['N/http', 'N/https', 'N/log', 'N/record', 'N/runtime', 'N/search'],
                 const searchObj = search.create({
                     type: 'customrecord_uni_serv_integ',
                     columns: [
-                        'custrecord_uni_serv_integ_tok_proveedor',
-                        'custrecord_uni_serv_integ_link_proveedor'
+                        'custrecord_uni_serv_integ_tok_recep_art',
+                        'custrecord_uni_serv_integ_link_recep_art'
                     ]
                 });
 
                 searchObj.run().each(result => {
                     res.push({
-                        token: result.getValue('custrecord_uni_serv_integ_tok_proveedor'),
-                        url: result.getValue('custrecord_uni_serv_integ_link_proveedor')
+                        token: result.getValue('custrecord_uni_serv_integ_tok_recep_art'),
+                        url: result.getValue('custrecord_uni_serv_integ_link_recep_art')
                     });
                     return true;
                 });
